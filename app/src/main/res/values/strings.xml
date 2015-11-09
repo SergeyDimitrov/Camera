@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Camera</string>
+
+    <string name="shot_button_text">Take Photo</string>
+    <string name="save_image_item_text">Save Photo</string>
+    <string name="dialog_header_text">Enter filename</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="error">Error</string>
+    <string name="no_photo_error">No photo to save</string>
+
+</resources>
