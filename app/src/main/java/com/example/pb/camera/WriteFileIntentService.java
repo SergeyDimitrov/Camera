@@ -3,7 +3,6 @@ package com.example.pb.camera;
 import android.app.IntentService;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.widget.Toast;
 
 import java.io.FileOutputStream;
 
@@ -11,6 +10,7 @@ public class WriteFileIntentService extends IntentService {
 
     public static final String PATH_KEY = "path_key";
     public static final String IMAGE_KEY = "image_key";
+    public static final String ERROR_ACTION = "error_action";
 
     public WriteFileIntentService() {
         super("WriteFileIntentService");
@@ -27,7 +27,7 @@ public class WriteFileIntentService extends IntentService {
                 out = new FileOutputStream(path);
                 photo.compress(Bitmap.CompressFormat.JPEG, 100, out);
             } catch (Exception e) {
-                Toast.makeText(this, R.string.error, Toast.LENGTH_LONG).show();
+                sendErrorMessage();
             } finally {
                 try {
                     if (out != null) {
@@ -35,10 +35,15 @@ public class WriteFileIntentService extends IntentService {
                         out.close();
                     }
                 } catch (Exception e) {
-                    Toast.makeText(this, R.string.error, Toast.LENGTH_SHORT).show();
+                    sendErrorMessage();
                 }
 
             }
         }
     }
+
+    private void sendErrorMessage() {
+        sendBroadcast(new Intent().setAction(ERROR_ACTION));
+    }
+
 }

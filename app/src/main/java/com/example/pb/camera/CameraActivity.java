@@ -3,8 +3,11 @@ package com.example.pb.camera;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.FragmentManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -26,6 +29,12 @@ public class CameraActivity extends AppCompatActivity {
     private Bitmap photo;
     private RetainedFragment dataFragment;
     private AlertDialog saveDialog;
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+        }
+    };
 
     private static final String RETAIN_TAG = "retain_tag";
 
@@ -37,6 +46,9 @@ public class CameraActivity extends AppCompatActivity {
         setContentView(R.layout.activity_camera);
         shotButton = (Button)findViewById(R.id.shot_button);
         photoImageView = (ImageView)findViewById(R.id.camera_image);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(WriteFileIntentService.ERROR_ACTION);
+        registerReceiver(receiver, filter);
 
         shotButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -66,6 +78,7 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        unregisterReceiver(receiver);
         if (isChangingConfigurations()) {
             dataFragment.setImage(photo);
             if (saveDialog != null) {

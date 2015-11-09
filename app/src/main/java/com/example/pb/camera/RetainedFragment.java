@@ -27,9 +27,11 @@ public class RetainedFragment extends Fragment {
     public Bitmap getImage() {
         return image;
     }
+
     public String getFilename() {
         return filename;
     }
+
     public void setFilename(String filename) {
         this.filename = filename;
     }
