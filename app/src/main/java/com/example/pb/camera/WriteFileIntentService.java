@@ -22,7 +22,7 @@ public class WriteFileIntentService extends IntentService {
         if (intent != null) {
             Bitmap photo = (Bitmap)intent.getExtras().getParcelable(IMAGE_KEY);
             String filename = intent.getExtras().getString(FILENAME_KEY);
-            String path = Environment.getExternalStorageDirectory().getPath() + "/Pictures" + "/" + filename + ".jpg";
+            String path = Environment.getExternalStorageDirectory().getPath() + "/Pictures/" + filename + ".jpg";
 
             if (filename.equals("")) {
                 sendErrorMessage();
