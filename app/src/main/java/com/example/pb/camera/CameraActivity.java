@@ -129,12 +129,11 @@ public class CameraActivity extends AppCompatActivity {
                 .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        String filename = ((EditText)saveDialog.findViewById(R.id.filename)).getText().toString() + ".jpg";
-                        String path = Environment.getExternalStorageDirectory().getPath() + "/Pictures" + "/" + filename;
+                        String filename = ((EditText)saveDialog.findViewById(R.id.filename)).getText().toString();
 
                         startService(new Intent(CameraActivity.this, WriteFileIntentService.class)
                                         .putExtra(WriteFileIntentService.IMAGE_KEY, photo)
-                                        .putExtra(WriteFileIntentService.PATH_KEY, path)
+                                        .putExtra(WriteFileIntentService.FILENAME_KEY, filename)
                         );
                         saveDialog.cancel();
                         saveDialog = null;
