@@ -1,151 +1,235 @@
 package com.example.pb.camera;
 
-import android.app.AlertDialog;
-import android.app.Dialog;
+import android.app.Activity;
 import android.app.FragmentManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.Bitmap;
-import android.os.Environment;
-import android.provider.MediaStore;
-import android.support.v7.app.AppCompatActivity;
+import android.graphics.BitmapFactory;
+import android.hardware.Camera;
 import android.os.Bundle;
-import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.util.Log;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.Toast;
-import java.io.File;
 
-public class CameraActivity extends AppCompatActivity {
+import java.io.ByteArrayOutputStream;
+
+public class CameraActivity extends Activity {
+
     private Button shotButton;
-    private ImageView photoImageView;
+    private Button saveButton;
+    private Button changeCameraButton;
+
+    private FrameLayout cameraPreviewLayout;
+    private SurfaceView preview;
+    private Camera camera;
+    private SurfaceHolder holder;
     private Bitmap photo;
+
+
+    private int cameraID = 0;
+    private static final String CAMERA_ID_KEY = "camera_id_key";
+
     private RetainedFragment dataFragment;
-    private AlertDialog saveDialog;
-    private BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
-        }
-    };
 
-    private static final String RETAIN_TAG = "retain_tag";
+    private static final String RETAIN_PHOTO_TAG = "retain_photo_tag";
 
-    private static final int REQUEST_TAKE_PHOTO = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
         shotButton = (Button)findViewById(R.id.shot_button);
-        photoImageView = (ImageView)findViewById(R.id.camera_image);
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(WriteFileIntentService.ERROR_ACTION);
-        registerReceiver(receiver, filter);
+        saveButton = (Button)findViewById(R.id.save_button);
+        changeCameraButton = (Button)findViewById(R.id.change_camera_button);
+
+        if (savedInstanceState != null) {
+            cameraID = savedInstanceState.getInt(CAMERA_ID_KEY);
+        }
+
+        // Creating camera preview
+
+        cameraPreviewLayout = (FrameLayout)findViewById(R.id.camera_preview);
+        preview = new SurfaceView(this);
+        holder = preview.getHolder();
+        holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+
+        holder.addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                Log.d("myTAG", "surfaceCreated");
+                try {
+                    if (camera != null) camera.setPreviewDisplay(holder);
+                } catch (Exception e) {
+                    Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                }
+                Log.d("myTAG", "surfaceCreatedEnd");
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                Log.d("myTAG", "surfaceChanged");
+                try {
+                    camera.startPreview();
+                } catch (Exception e) {
+                    Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                }
+                Log.d("myTAG", "surfaceChangedEnd");
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                Log.d("myTAG", "surfaceDestroyed");
+                if (camera != null) camera.stopPreview();
+                else Log.d("myTag", "No need");
+                Log.d("myTAG", "surfaceDestroyedEnd");
+            }
+        });
+
+        cameraPreviewLayout.addView(preview);
+
+        // Setting listeners
 
         shotButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-                    startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
-                }
+                enableButtons(false);
+                camera.takePicture(null, null, new Camera.PictureCallback() {
+                    @Override
+                    public void onPictureTaken(byte[] data, Camera camera) {
+                        Log.d("myTAG", "Start");
+                        photo = BitmapFactory.decodeByteArray(data, 0, data.length);
+
+                        Log.d("myTAG", "End");
+                        camera.startPreview();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                enableButtons(true);
+                            }
+                        });
+                    }
+                });
+                Log.d("myTAG", "Picture taken");
             }
         });
 
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                enableButtons(false);
+                if (photo == null) {
+                    Toast.makeText(CameraActivity.this, R.string.no_photo_error, Toast.LENGTH_SHORT).show();
+                } else {
+                    // Compress photo
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                            photo.compress(Bitmap.CompressFormat.PNG, 100, stream);
+                            byte[] bytes = stream.toByteArray();
+
+                            startActivity(new Intent(CameraActivity.this, SavePhotoActivity.class)
+                                    .putExtra(SavePhotoActivity.PHOTO_KEY, bytes));
+                        }
+                    }).start();
+
+                }
+                enableButtons(true);
+            }
+        });
+
+        changeCameraButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                enableButtons(false);
+                cameraID = (cameraID + 1) % Camera.getNumberOfCameras();
+                camera.stopPreview();
+                camera.release();
+                camera = getCameraInstance();
+
+                try {
+                    camera.setPreviewDisplay(holder);
+                    camera.startPreview();
+                    Log.d("myTAG", "Switching camera successed");
+                } catch (Exception e) {
+                    Log.d("myTAG", "Switching camera failed");
+                    Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                }
+                enableButtons(true);
+            }
+        });
+
+        // Retaining data
+
         FragmentManager fm = getFragmentManager();
-        dataFragment = (RetainedFragment) fm.findFragmentByTag(RETAIN_TAG);
+        dataFragment = (RetainedFragment) fm.findFragmentByTag(RETAIN_PHOTO_TAG);
 
         if (dataFragment == null) {
             dataFragment = new RetainedFragment();
-            fm.beginTransaction().add(dataFragment, RETAIN_TAG).commit();
+            fm.beginTransaction().add(dataFragment, RETAIN_PHOTO_TAG).commit();
         }
+
         photo = dataFragment.getImage();
-        if (photo != null) photoImageView.setImageBitmap(photo);
-        if (dataFragment.getFilename() != null) {
-            createDialog().show();
-            ((EditText)saveDialog.findViewById(R.id.filename)).setText(dataFragment.getFilename());
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        savedInstanceState.putInt(CAMERA_ID_KEY, cameraID);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d("myTAG", "onResume");
+        camera = getCameraInstance();
+        Log.d("myTAG", "onResumeEnd");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.d("myTAG", "onPause");
+        releaseCamera();
+        camera = null;
+        Log.d("myTAG", "onPauseEnd");
+    }
+
+
+    private void releaseCamera() {
+        if (camera != null) {
+            camera.release();
+            camera = null;
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(receiver);
         if (isChangingConfigurations()) {
             dataFragment.setImage(photo);
-            if (saveDialog != null) {
-                dataFragment.setFilename(((EditText)saveDialog.findViewById(R.id.filename)).getText().toString());
-            } else {
-                dataFragment.setFilename(null);
-            }
         }
     }
 
-    @Override
-    protected void onSaveInstanceState(Bundle savedInstanceState) {
-        super.onSaveInstanceState(savedInstanceState);
-
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK) {
-            photo = (Bitmap)data.getExtras().get("data");
-            photoImageView.setImageBitmap(photo);
+    public Camera getCameraInstance() {
+        Camera c = null;
+        try {
+            c = Camera.open(cameraID);
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.camera_not_available_error, Toast.LENGTH_SHORT).show();
         }
+        return c;
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_camera, menu);
-        return true;
+    private void enableButtons(boolean enable) {
+        saveButton.setEnabled(enable);
+        shotButton.setEnabled(enable);
+        changeCameraButton.setEnabled(enable);
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-
-        if (id == R.id.save_image_item) {
-            if (photo == null) {
-                Toast.makeText(this, R.string.no_photo_error, Toast.LENGTH_SHORT).show();
-            } else {
-                createDialog().show();
-            }
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-    private Dialog createDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setView(getLayoutInflater().inflate(R.layout.save_dialog, null))
-                .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        String filename = ((EditText)saveDialog.findViewById(R.id.filename)).getText().toString();
-
-                        startService(new Intent(CameraActivity.this, WriteFileIntentService.class)
-                                        .putExtra(WriteFileIntentService.IMAGE_KEY, photo)
-                                        .putExtra(WriteFileIntentService.FILENAME_KEY, filename)
-                        );
-                        saveDialog.cancel();
-                        saveDialog = null;
-                    }
-                })
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        saveDialog.cancel();
-                        saveDialog = null;
-                    }
-                });
-        return saveDialog = builder.create();
-    }
 }
