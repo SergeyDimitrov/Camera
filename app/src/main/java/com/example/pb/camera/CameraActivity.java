@@ -23,8 +23,6 @@ public class CameraActivity extends Activity {
     private Button saveButton;
     private Button changeCameraButton;
 
-    private FrameLayout cameraPreviewLayout;
-    private SurfaceView preview;
     private Camera camera;
     private SurfaceHolder holder;
     private Bitmap photo;
@@ -53,8 +51,8 @@ public class CameraActivity extends Activity {
 
         // Creating camera preview
 
-        cameraPreviewLayout = (FrameLayout)findViewById(R.id.camera_preview);
-        preview = new SurfaceView(this);
+        FrameLayout cameraPreviewLayout = (FrameLayout)findViewById(R.id.camera_preview);
+        SurfaceView preview = new SurfaceView(this);
         holder = preview.getHolder();
         holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
@@ -125,10 +123,10 @@ public class CameraActivity extends Activity {
                 if (photo == null) {
                     Toast.makeText(CameraActivity.this, R.string.no_photo_error, Toast.LENGTH_SHORT).show();
                 } else {
-                    // Compress photo
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
+                            // Compress photo
                             ByteArrayOutputStream stream = new ByteArrayOutputStream();
                             photo.compress(Bitmap.CompressFormat.PNG, 100, stream);
                             byte[] bytes = stream.toByteArray();
@@ -148,8 +146,10 @@ public class CameraActivity extends Activity {
             public void onClick(View v) {
                 enableButtons(false);
                 cameraID = (cameraID + 1) % Camera.getNumberOfCameras();
-                camera.stopPreview();
-                camera.release();
+                if (camera != null) {
+                    camera.stopPreview();
+                    camera.release();
+                }
                 camera = getCameraInstance();
 
                 try {
