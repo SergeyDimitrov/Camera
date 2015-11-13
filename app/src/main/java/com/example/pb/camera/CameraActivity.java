@@ -126,10 +126,11 @@ public class CameraActivity extends Activity {
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
-                            // Compress photo
                             ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                            photo.compress(Bitmap.CompressFormat.PNG, 100, stream);
+                            photo.compress(Bitmap.CompressFormat.JPEG, 20, stream);
                             byte[] bytes = stream.toByteArray();
+
+                            Log.d("myTAG", String.valueOf(bytes.length));
 
                             startActivity(new Intent(CameraActivity.this, SavePhotoActivity.class)
                                     .putExtra(SavePhotoActivity.PHOTO_KEY, bytes));
