@@ -3,12 +3,13 @@ package com.example.pb.camera;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.FragmentManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.view.View;
@@ -17,26 +18,36 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import java.io.File;
+
 public class SavePhotoActivity extends Activity {
 
     private ImageView photoView;
     private Button savePhotoButton;
     private AlertDialog saveDialog;
 
-    private byte[] compressedPhoto;
-
-    private RetainedFragment dataFragment;
-
-    private static final String RETAIN_FILENAME_TAG = "retain_filename";
-    public static final String PHOTO_KEY = "photo";
-
+    private SharedPreferences settings;
+    private static final String APP_PREFERENCES = "preferences";
+    private static final String APP_PREFERENCES_FILENAME = "filename";
 
     private BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             switch (intent.getAction()) {
                 case WriteFileIntentService.ERROR_ACTION:
-                    Toast.makeText(SavePhotoActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                    int errorMsg;
+                    switch (intent.getIntExtra(WriteFileIntentService.ERROR_TYPE, -1)) {
+                        case WriteFileIntentService.ERROR:
+                            errorMsg = R.string.closing_error;
+                            break;
+                        case WriteFileIntentService.WRITING_FILE_ERROR:
+                            errorMsg = R.string.writing_file_error;
+                            break;
+                        default:
+                            errorMsg = R.string.unknown_error;
+                            break;
+                    }
+                    Toast.makeText(SavePhotoActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
                     break;
                 case WriteFileIntentService.SUCCESS_ACTION:
                     Toast.makeText(SavePhotoActivity.this, R.string.success, Toast.LENGTH_SHORT).show();
@@ -58,11 +69,14 @@ public class SavePhotoActivity extends Activity {
         filter.addAction(WriteFileIntentService.SUCCESS_ACTION);
         registerReceiver(receiver, filter);
 
-        compressedPhoto = getIntent().getExtras().getByteArray(PHOTO_KEY);
-        if (compressedPhoto != null) {
-            photoView.setImageBitmap(BitmapFactory.decodeByteArray(compressedPhoto, 0, compressedPhoto.length));
+        File photo = new File(getFilesDir(), getResources().getString(R.string.temp_filename));
+
+        if (photo.exists()) {
+            Bitmap bitmap = BitmapFactory.decodeFile(photo.getAbsolutePath());
+            photoView.setImageBitmap(bitmap);
         } else {
             Toast.makeText(this, R.string.no_photo_error, Toast.LENGTH_SHORT).show();
+            finish();
         }
 
         savePhotoButton.setOnClickListener(new View.OnClickListener() {
@@ -72,30 +86,29 @@ public class SavePhotoActivity extends Activity {
             }
         });
 
-        FragmentManager fm = getFragmentManager();
-        dataFragment = (RetainedFragment) fm.findFragmentByTag(RETAIN_FILENAME_TAG);
-        if (dataFragment == null) {
-            dataFragment = new RetainedFragment();
-            fm.beginTransaction().add(dataFragment, RETAIN_FILENAME_TAG).commit();
+        settings = getSharedPreferences(APP_PREFERENCES, MODE_PRIVATE);
+        if (settings.contains(APP_PREFERENCES_FILENAME)) {
+            createDialog().show();
+            ((EditText)saveDialog.findViewById(R.id.filename)).setText(settings.getString(APP_PREFERENCES_FILENAME, ""));
         }
 
-        if (dataFragment.getFilename() != null) {
-            createDialog().show();
-            ((EditText)saveDialog.findViewById(R.id.filename)).setText(dataFragment.getFilename());
-        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(receiver);
+        SharedPreferences.Editor editor = settings.edit();
         if (isChangingConfigurations()) {
             if (saveDialog != null) {
-                dataFragment.setFilename(((EditText)saveDialog.findViewById(R.id.filename)).getText().toString());
+                editor.putString(APP_PREFERENCES_FILENAME, ((EditText) saveDialog.findViewById(R.id.filename)).getText().toString());
             } else {
-                dataFragment.setFilename(null);
+                editor.remove(APP_PREFERENCES_FILENAME);
             }
+        } else {
+            editor.remove(APP_PREFERENCES_FILENAME);
         }
+        editor.apply();
     }
 
     private Dialog createDialog() {
@@ -107,7 +120,6 @@ public class SavePhotoActivity extends Activity {
                         String filename = ((EditText) saveDialog.findViewById(R.id.filename)).getText().toString();
 
                         startService(new Intent(SavePhotoActivity.this, WriteFileIntentService.class)
-                                        .putExtra(WriteFileIntentService.IMAGE_KEY, compressedPhoto)
                                         .putExtra(WriteFileIntentService.FILENAME_KEY, filename)
                         );
                         saveDialog.cancel();

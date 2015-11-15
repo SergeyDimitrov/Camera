@@ -1,20 +1,23 @@
 <resources>
     <string name="app_name">Camera</string>
 
-    <string name="shot_button_text">Take Photo</string>
-    <string name="save_image_item_text">Save Photo</string>
     <string name="dialog_header_text">Enter filename</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
-    <string name="change_camera">Change Camera</string>
-    <string name="error">Error</string>
+    <string name="temp_filename">tmp.jpg</string>
 
     <string name="title_activity_save_photo">SavePhotoActivity</string>
     <string name="save_photo">Save Photo</string>
     <string name="action_settings">Settings</string>
 
+    <string name="error">Error</string>
     <string name="success">Success</string>
+    <string name="preview_error">Failed to start camera preview</string>
     <string name="camera_not_available_error">Camera not available</string>
     <string name="no_photo_error">No photo to save</string>
+    <string name="orientation_error">Unknown orientation</string>
+    <string name="writing_file_error">Failed to write the file</string>
+    <string name="closing_error">File is saved, but some error occurred</string>
+    <string name="unknown_error">Unknown error</string>
 
 </resources>

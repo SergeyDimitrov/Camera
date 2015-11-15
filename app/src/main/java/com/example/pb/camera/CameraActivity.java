@@ -1,49 +1,42 @@
 package com.example.pb.camera;
 
 import android.app.Activity;
-import android.app.FragmentManager;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.hardware.Camera;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.OrientationEventListener;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
-import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class CameraActivity extends Activity {
 
-    private Button shotButton;
-    private Button saveButton;
-    private Button changeCameraButton;
+    private ImageButton shotButton;
+    private ImageButton changeCameraButton;
 
     private Camera camera;
     private SurfaceHolder holder;
-    private Bitmap photo;
-
 
     private int cameraID = 0;
     private static final String CAMERA_ID_KEY = "camera_id_key";
 
-    private RetainedFragment dataFragment;
-
-    private static final String RETAIN_PHOTO_TAG = "retain_photo_tag";
-
+    private static final int delta = 10;
+    private OrientationEventListener orientationListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
-        shotButton = (Button)findViewById(R.id.shot_button);
-        saveButton = (Button)findViewById(R.id.save_button);
-        changeCameraButton = (Button)findViewById(R.id.change_camera_button);
+        shotButton = (ImageButton)findViewById(R.id.shot_button);
+        changeCameraButton = (ImageButton)findViewById(R.id.change_camera_button);
 
         if (savedInstanceState != null) {
             cameraID = savedInstanceState.getInt(CAMERA_ID_KEY);
@@ -59,38 +52,44 @@ public class CameraActivity extends Activity {
         holder.addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
-                Log.d("myTAG", "surfaceCreated");
                 try {
                     if (camera != null) camera.setPreviewDisplay(holder);
                 } catch (Exception e) {
-                    Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CameraActivity.this, R.string.preview_error, Toast.LENGTH_SHORT).show();
                 }
-                Log.d("myTAG", "surfaceCreatedEnd");
             }
 
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-                Log.d("myTAG", "surfaceChanged");
                 try {
                     camera.startPreview();
                 } catch (Exception e) {
-                    Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CameraActivity.this, R.string.preview_error, Toast.LENGTH_SHORT).show();
                 }
-                Log.d("myTAG", "surfaceChangedEnd");
             }
 
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
-                Log.d("myTAG", "surfaceDestroyed");
                 if (camera != null) camera.stopPreview();
-                else Log.d("myTag", "No need");
-                Log.d("myTAG", "surfaceDestroyedEnd");
             }
         });
 
         cameraPreviewLayout.addView(preview);
 
         // Setting listeners
+
+        orientationListener = new OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
+            public void onOrientationChanged(int angle) {
+                if (angle > 270 - delta && angle < 270 + delta) {
+                    rotateButtons(270);
+                } else if (angle > 90 - delta && angle < 90 + delta) {
+                    rotateButtons(90);
+                } else if (angle > 360 - delta || angle < delta) {
+                    rotateButtons(0);
+                }
+            }
+        };
+
 
         shotButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -99,48 +98,40 @@ public class CameraActivity extends Activity {
                 camera.takePicture(null, null, new Camera.PictureCallback() {
                     @Override
                     public void onPictureTaken(byte[] data, Camera camera) {
-                        Log.d("myTAG", "Start");
-                        photo = BitmapFactory.decodeByteArray(data, 0, data.length);
-
-                        Log.d("myTAG", "End");
-                        camera.startPreview();
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                enableButtons(true);
+                        // Writing to internal storage
+                        FileOutputStream out = null;
+                        try {
+                            out = openFileOutput(getResources().getString(R.string.temp_filename), MODE_PRIVATE);
+                            out.write(data);
+                        } catch (IOException e) {
+                            Toast.makeText(CameraActivity.this, R.string.writing_file_error, Toast.LENGTH_SHORT).show();
+                        } finally {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    enableButtons(true);
+                                }
+                            });
+                            try {
+                                if (out != null) {
+                                    out.flush();
+                                    out.close();
+                                }
+                            } catch (IOException e) {
+                                Toast.makeText(CameraActivity.this, R.string.closing_error, Toast.LENGTH_SHORT).show();
                             }
-                        });
+                        }
+
+                        camera.startPreview();
+
+                        startActivity(new Intent(CameraActivity.this, SavePhotoActivity.class));
+
                     }
                 });
                 Log.d("myTAG", "Picture taken");
             }
         });
 
-        saveButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                enableButtons(false);
-                if (photo == null) {
-                    Toast.makeText(CameraActivity.this, R.string.no_photo_error, Toast.LENGTH_SHORT).show();
-                } else {
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                            photo.compress(Bitmap.CompressFormat.JPEG, 20, stream);
-                            byte[] bytes = stream.toByteArray();
-
-                            Log.d("myTAG", String.valueOf(bytes.length));
-
-                            startActivity(new Intent(CameraActivity.this, SavePhotoActivity.class)
-                                    .putExtra(SavePhotoActivity.PHOTO_KEY, bytes));
-                        }
-                    }).start();
-
-                }
-                enableButtons(true);
-            }
-        });
 
         changeCameraButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -159,23 +150,12 @@ public class CameraActivity extends Activity {
                     Log.d("myTAG", "Switching camera successed");
                 } catch (Exception e) {
                     Log.d("myTAG", "Switching camera failed");
-                    Toast.makeText(CameraActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CameraActivity.this, R.string.preview_error, Toast.LENGTH_SHORT).show();
                 }
                 enableButtons(true);
             }
         });
 
-        // Retaining data
-
-        FragmentManager fm = getFragmentManager();
-        dataFragment = (RetainedFragment) fm.findFragmentByTag(RETAIN_PHOTO_TAG);
-
-        if (dataFragment == null) {
-            dataFragment = new RetainedFragment();
-            fm.beginTransaction().add(dataFragment, RETAIN_PHOTO_TAG).commit();
-        }
-
-        photo = dataFragment.getImage();
     }
 
     @Override
@@ -187,18 +167,16 @@ public class CameraActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        Log.d("myTAG", "onResume");
+        orientationListener.enable();
         camera = getCameraInstance();
-        Log.d("myTAG", "onResumeEnd");
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        Log.d("myTAG", "onPause");
+        orientationListener.disable();
         releaseCamera();
         camera = null;
-        Log.d("myTAG", "onPauseEnd");
     }
 
 
@@ -206,14 +184,6 @@ public class CameraActivity extends Activity {
         if (camera != null) {
             camera.release();
             camera = null;
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (isChangingConfigurations()) {
-            dataFragment.setImage(photo);
         }
     }
 
@@ -228,9 +198,32 @@ public class CameraActivity extends Activity {
     }
 
     private void enableButtons(boolean enable) {
-        saveButton.setEnabled(enable);
         shotButton.setEnabled(enable);
         changeCameraButton.setEnabled(enable);
+    }
+
+    private void rotateButtons(int angle) {
+        int shotID = -1;
+        int changeID = -1;
+        switch (angle) {
+            case 0:
+                changeID = R.drawable.change_down;
+                shotID = R.drawable.shot_down;
+                break;
+            case 90:
+                changeID = R.drawable.change_left;
+                shotID = R.drawable.shot_left;
+                break;
+            case 270:
+                changeID = R.drawable.change_right;
+                shotID = R.drawable.shot_right;
+                break;
+            default:
+                Toast.makeText(this, R.string.orientation_error, Toast.LENGTH_SHORT).show();
+                return;
+        }
+        changeCameraButton.setImageDrawable(getResources().getDrawable(changeID));
+        shotButton.setImageDrawable(getResources().getDrawable(shotID));
     }
 
 }

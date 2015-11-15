@@ -3,15 +3,28 @@ package com.example.pb.camera;
 import android.app.IntentService;
 import android.content.Intent;
 import android.os.Environment;
+import android.util.Log;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class WriteFileIntentService extends IntentService {
 
     public static final String FILENAME_KEY = "filename_key";
-    public static final String IMAGE_KEY = "image_key";
+
+    private static final int BUFFER_SIZE = 1024;
+
     public static final String SUCCESS_ACTION = "success_action";
     public static final String ERROR_ACTION = "error_action";
+    public static final String ERROR_TYPE = "error_type";
+
+    public static final int ERROR = 1;
+    public static final int WRITING_FILE_ERROR = 2;
 
     public WriteFileIntentService() {
         super("WriteFileIntentService");
@@ -21,27 +34,28 @@ public class WriteFileIntentService extends IntentService {
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             boolean success = true;
-            byte[] photo = intent.getExtras().getByteArray(IMAGE_KEY);
-
-            if (photo == null) {
-                sendErrorMessage();
-                return;
-            }
-
             String filename = intent.getExtras().getString(FILENAME_KEY);
             String path = Environment.getExternalStorageDirectory().getPath() + "/Pictures/" + filename + ".jpg";
 
             if (filename == null || filename.equals("")) {
-                sendErrorMessage();
+                sendErrorMessage(WRITING_FILE_ERROR);
                 return;
             }
 
-            FileOutputStream out = null;
+            InputStream in = null;
+            OutputStream out = null;
             try {
+                in = new FileInputStream(new File(getFilesDir(), getResources().getString(R.string.temp_filename)));
+                byte[] buffer = new byte[BUFFER_SIZE];
+                int bytesRead;
                 out = new FileOutputStream(path);
-                out.write(photo);
+
+                while((bytesRead = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, bytesRead);
+                }
+
             } catch (Exception e) {
-                sendErrorMessage();
+                sendErrorMessage(WRITING_FILE_ERROR);
                 success = false;
             } finally {
                 try {
@@ -49,8 +63,11 @@ public class WriteFileIntentService extends IntentService {
                         out.flush();
                         out.close();
                     }
+                    if (in != null) {
+                        in.close();
+                    }
                 } catch (Exception e) {
-                    sendErrorMessage();
+                    sendErrorMessage(ERROR);
                     success = false;
                 }
             }
@@ -64,8 +81,8 @@ public class WriteFileIntentService extends IntentService {
         sendBroadcast(new Intent().setAction(SUCCESS_ACTION));
     }
 
-    private void sendErrorMessage() {
-        sendBroadcast(new Intent().setAction(ERROR_ACTION));
+    private void sendErrorMessage(int error) {
+        sendBroadcast(new Intent().setAction(ERROR_ACTION).putExtra(ERROR_TYPE, error));
     }
 
 }
