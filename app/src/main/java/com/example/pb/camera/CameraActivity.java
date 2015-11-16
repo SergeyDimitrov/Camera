@@ -207,16 +207,16 @@ public class CameraActivity extends Activity {
         int changeID = -1;
         switch (angle) {
             case 0:
-                changeID = R.drawable.change_down;
-                shotID = R.drawable.shot_down;
-                break;
-            case 90:
-                changeID = R.drawable.change_left;
-                shotID = R.drawable.shot_left;
-                break;
-            case 270:
                 changeID = R.drawable.change_right;
                 shotID = R.drawable.shot_right;
+                break;
+            case 90:
+                changeID = R.drawable.change_up;
+                shotID = R.drawable.shot_up;
+                break;
+            case 270:
+                changeID = R.drawable.change_down;
+                shotID = R.drawable.shot_down;
                 break;
             default:
                 Toast.makeText(this, R.string.orientation_error, Toast.LENGTH_SHORT).show();

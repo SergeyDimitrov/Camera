@@ -72,8 +72,7 @@ public class SavePhotoActivity extends Activity {
         File photo = new File(getFilesDir(), getResources().getString(R.string.temp_filename));
 
         if (photo.exists()) {
-            Bitmap bitmap = BitmapFactory.decodeFile(photo.getAbsolutePath());
-            photoView.setImageBitmap(bitmap);
+            photoView.setImageBitmap(decodeSampledBitmap(100, 100));
         } else {
             Toast.makeText(this, R.string.no_photo_error, Toast.LENGTH_SHORT).show();
             finish();
@@ -134,6 +133,38 @@ public class SavePhotoActivity extends Activity {
                     }
                 });
         return saveDialog = builder.create();
+    }
+
+    private Bitmap decodeSampledBitmap(int reqWidth, int reqHeight) {
+        File file = new File(getFilesDir(), getResources().getString(R.string.temp_filename));
+
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+
+
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+
+        options.inJustDecodeBounds = false;
+        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+    }
+
+    private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            while ((halfHeight / inSampleSize) > reqHeight && (halfWidth / inSampleSize) > reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
     }
 
 }
