@@ -2,6 +2,9 @@ package com.example.pb.camera;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.hardware.SensorManager;
 import android.os.Bundle;
@@ -25,6 +28,8 @@ public class CameraActivity extends Activity {
     private Camera camera;
     private SurfaceHolder holder;
 
+    private int angle;
+
     private int cameraID = 0;
     private static final String CAMERA_ID_KEY = "camera_id_key";
 
@@ -45,7 +50,7 @@ public class CameraActivity extends Activity {
         // Creating camera preview
 
         FrameLayout cameraPreviewLayout = (FrameLayout)findViewById(R.id.camera_preview);
-        SurfaceView preview = new SurfaceView(this);
+        final SurfaceView preview = new SurfaceView(this);
         holder = preview.getHolder();
         holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
@@ -99,10 +104,32 @@ public class CameraActivity extends Activity {
                     @Override
                     public void onPictureTaken(byte[] data, Camera camera) {
                         // Writing to internal storage
+
+                        Matrix m = new Matrix();
+
+                        switch (angle) {
+                            case 270:
+                                m.postRotate(0);
+                                break;
+                            case 0:
+                                m.postRotate(270);
+                                break;
+                            case 90:
+                                m.postRotate(180);
+                                break;
+                        }
+
+                        Bitmap sourceImage = BitmapFactory.decodeByteArray(data, 0, data.length);
+
+                        Bitmap rotatedImage = Bitmap.createBitmap(sourceImage, 0, 0, sourceImage.getWidth(),
+                                sourceImage.getHeight(), m, true);
+
+
                         FileOutputStream out = null;
                         try {
                             out = openFileOutput(getResources().getString(R.string.temp_filename), MODE_PRIVATE);
-                            out.write(data);
+                            rotatedImage.compress(Bitmap.CompressFormat.PNG, 100, out);
+                            Log.d("myTAG", "Saved to internal storage");
                         } catch (IOException e) {
                             Toast.makeText(CameraActivity.this, R.string.writing_file_error, Toast.LENGTH_SHORT).show();
                         } finally {
@@ -112,10 +139,24 @@ public class CameraActivity extends Activity {
                                     enableButtons(true);
                                 }
                             });
+
+                            if (rotatedImage != null) {
+                                rotatedImage.recycle();
+                                rotatedImage = null;
+                                Log.d("myTAG", "Rotated image recycled");
+                            }
+
+                            if (sourceImage != null) {
+                                sourceImage.recycle();
+                                sourceImage = null;
+                                Log.d("myTAG", "Source image recycled");
+                            }
+
                             try {
                                 if (out != null) {
                                     out.flush();
                                     out.close();
+                                    Log.d("myTAG", "Closed streams to internal storage");
                                 }
                             } catch (IOException e) {
                                 Toast.makeText(CameraActivity.this, R.string.closing_error, Toast.LENGTH_SHORT).show();
@@ -203,8 +244,9 @@ public class CameraActivity extends Activity {
     }
 
     private void rotateButtons(int angle) {
-        int shotID = -1;
-        int changeID = -1;
+        int shotID;
+        int changeID;
+        this.angle = angle;
         switch (angle) {
             case 0:
                 changeID = R.drawable.change_right;

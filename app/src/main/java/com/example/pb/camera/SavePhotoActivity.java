@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -100,9 +101,12 @@ public class SavePhotoActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
 
-        photoView.setImageBitmap(null);
-        if (image != null) image.recycle();
-        image = null;
+        if (image != null) {
+            photoView.setImageBitmap(null);
+            image.recycle();
+            image = null;
+            Log.d("myTAG", "Photo view image recycled");
+        }
 
         unregisterReceiver(receiver);
         SharedPreferences.Editor editor = settings.edit();
