@@ -28,13 +28,12 @@ public class CameraActivity extends Activity {
     private Camera camera;
     private SurfaceHolder holder;
 
-    private int angle;
-
     private int cameraID = 0;
     private static final String CAMERA_ID_KEY = "camera_id_key";
 
     private static final int delta = 10;
     private OrientationEventListener orientationListener;
+    private int deviceAngle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,25 +104,12 @@ public class CameraActivity extends Activity {
                     public void onPictureTaken(byte[] data, Camera camera) {
                         // Writing to internal storage
 
-                        Matrix m = new Matrix();
-
-                        switch (angle) {
-                            case 270:
-                                m.postRotate(0);
-                                break;
-                            case 0:
-                                m.postRotate(270);
-                                break;
-                            case 90:
-                                m.postRotate(180);
-                                break;
-                        }
+                        Matrix rotationMatrix = new Matrix();
+                        rotationMatrix.postRotate(270 - deviceAngle);
 
                         Bitmap sourceImage = BitmapFactory.decodeByteArray(data, 0, data.length);
-
                         Bitmap rotatedImage = Bitmap.createBitmap(sourceImage, 0, 0, sourceImage.getWidth(),
-                                sourceImage.getHeight(), m, true);
-
+                                sourceImage.getHeight(), rotationMatrix, true);
 
                         FileOutputStream out = null;
                         try {
@@ -246,7 +232,7 @@ public class CameraActivity extends Activity {
     private void rotateButtons(int angle) {
         int shotID;
         int changeID;
-        this.angle = angle;
+        deviceAngle = angle;
         switch (angle) {
             case 0:
                 changeID = R.drawable.change_right;
