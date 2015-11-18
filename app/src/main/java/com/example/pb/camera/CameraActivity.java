@@ -4,10 +4,14 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.hardware.SensorManager;
+import android.opengl.GLES10;
+import android.opengl.GLSurfaceView;
 import android.os.Bundle;
+import android.os.Debug;
 import android.util.Log;
 import android.view.OrientationEventListener;
 import android.view.SurfaceHolder;
@@ -19,6 +23,9 @@ import android.widget.Toast;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
+
+import javax.microedition.khronos.opengles.GL10;
 
 public class CameraActivity extends Activity {
 
@@ -66,6 +73,10 @@ public class CameraActivity extends Activity {
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 try {
+                    Camera.Parameters params = camera.getParameters();
+                    Camera.Size bestSize = getBestSize(params.getSupportedPreviewSizes(), width, height);
+                    params.setPreviewSize(bestSize.width, bestSize.height);
+                    camera.setParameters(params);
                     camera.startPreview();
                 } catch (Exception e) {
                     Toast.makeText(CameraActivity.this, R.string.preview_error, Toast.LENGTH_SHORT).show();
@@ -75,6 +86,37 @@ public class CameraActivity extends Activity {
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
                 if (camera != null) camera.stopPreview();
+            }
+
+            private Camera.Size getBestSize(List<Camera.Size> sizes, int width, int height) {
+                final double ASPECT_TOLERANCE = 0.2;
+                double targetRatio = (double) width / height;
+                if (sizes == null) {
+                    return null;
+                }
+                Camera.Size optimalSize = null;
+                double minDiff = Double.MAX_VALUE;
+                int targetHeight = height;
+
+                for(Camera.Size size : sizes) {
+                    double ratio = (double) size.width / size.height;
+                    if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE) continue;
+                    if (Math.abs(size.height - targetHeight) < minDiff) {
+                        optimalSize = size;
+                        minDiff = Math.abs(size.height - targetHeight);
+                    }
+                }
+
+                if (optimalSize == null) {
+                    minDiff = Double.MAX_VALUE;
+                    for(Camera.Size size : sizes) {
+                        if (Math.abs(size.height - targetHeight) < minDiff) {
+                            optimalSize = size;
+                            minDiff = Math.abs(size.height - targetHeight);
+                        }
+                    }
+                }
+                return optimalSize;
             }
         });
 
@@ -105,7 +147,21 @@ public class CameraActivity extends Activity {
                         // Writing to internal storage
 
                         Matrix rotationMatrix = new Matrix();
-                        rotationMatrix.postRotate(270 - deviceAngle);
+                        int rotationAngle = 0;
+
+                        switch (deviceAngle) {
+                            case 0:
+                                rotationAngle = (cameraID == 0 ? 90 : 270);
+                                break;
+                            case 270:
+                                rotationAngle = 0;
+                                break;
+                            case 90:
+                                rotationAngle = 180;
+                                break;
+                        }
+
+                        rotationMatrix.postRotate(rotationAngle);
 
                         Bitmap sourceImage = BitmapFactory.decodeByteArray(data, 0, data.length);
                         Bitmap rotatedImage = Bitmap.createBitmap(sourceImage, 0, 0, sourceImage.getWidth(),
@@ -114,7 +170,7 @@ public class CameraActivity extends Activity {
                         FileOutputStream out = null;
                         try {
                             out = openFileOutput(getResources().getString(R.string.temp_filename), MODE_PRIVATE);
-                            rotatedImage.compress(Bitmap.CompressFormat.PNG, 100, out);
+                            rotatedImage.compress(Bitmap.CompressFormat.JPEG, 100, out);
                             Log.d("myTAG", "Saved to internal storage");
                         } catch (IOException e) {
                             Toast.makeText(CameraActivity.this, R.string.writing_file_error, Toast.LENGTH_SHORT).show();
